@@ -111,7 +111,7 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-lg bg-gray-200 animate-pulse"></div>
               )}
               <div>
-                <span className="text-gray-800">{todo.title}</span>
+                <span className="text-gray-800 me-3">{todo.title}</span>
                 {todo.dueDate && (
                   <span
                     className={`text-sm ${
