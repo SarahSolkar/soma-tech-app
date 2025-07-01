@@ -53,3 +53,29 @@ Implement a task dependency system that allows tasks to depend on other tasks. T
 3. Submit a link to your repository in the application form.
 
 Thanks for your time and effort. We'll be in touch soon!
+
+## Solution
+
+### Part 1: Due Dates
+
+A `dueDate` field of type `DateTime?` was added to the `Todo` model in `prisma/schema.prisma`. 
+
+The frontend was updated to include a `DatePicker` component, allowing users to select a due date when creating or editing a task. 
+
+The task list now displays the formatted due date. If the due date is in the past, the text is colored red to indicate that it is overdue.
+
+### Part 2: Image Generation
+
+An `imageUrl` field of type `String?` was added to the `Todo` model. 
+
+When a new todo is created, a request is made to a new API route (`/api/pexels`). This route fetches a relevant image from the Pexels API based on the todo's title. 
+
+The `imageUrl` is then saved to the database and the image is displayed in the UI. A loading skeleton is shown while the image is being fetched and updated.
+
+### Part 3: Task Dependencies
+
+To implement task dependencies, a many-to-many self-relation was added to the `Todo` model. This allows a task to have multiple dependencies and to be a dependency for multiple other tasks.
+
+The API includes logic to prevent circular dependencies when creating or updating task relationships.
+
+The frontend visualizes the dependency graph using a topological sort of the tasks. It highlights the critical path, which is the longest path of dependent tasks, and calculates the earliest possible start date for each task based on the completion of its dependencies.

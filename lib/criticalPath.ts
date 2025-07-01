@@ -30,7 +30,8 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
   };
 
   // Helper to add days to a date
-  const addDays = (date: Date, days: number): Date => {
+  const addDays = (date: Date | null, days: number): Date | null=> {
+    if (!date) return null;
     const result = new Date(date);
     result.setDate(result.getDate() + days);
     return result;
@@ -55,7 +56,7 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
     
     todoMap.set(todo.id, {
       ...todo,
-      dueDate,
+      dueDate: dueDate,
       duration,
       earliestStartDate: null,
       earliestFinishDate: null,
