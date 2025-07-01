@@ -7,6 +7,10 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
+      include: {
+        dependencies: true,
+        dependents: true,
+      },
     });
     return NextResponse.json(todos);
   } catch (error) {
@@ -19,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { title, dueDate } = await request.json();
+    const { title, dueDate, dependencyIds = [] } = await request.json();
     if (!title || title.trim() === "") {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
@@ -27,6 +31,13 @@ export async function POST(request: Request) {
       data: {
         title,
         dueDate: dueDate ? new Date(`${dueDate}T23:59:59.999Z`) : null,
+        dependencies: {
+          connect: dependencyIds.map((id: number) => ({ id })),
+        },
+      },
+      include: {
+        dependencies: true,
+        dependents: true,
       },
     });
     return NextResponse.json(todo, { status: 201 });
