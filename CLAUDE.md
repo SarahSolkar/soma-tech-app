@@ -1,1 +1,0 @@
-This file is for documentation and guidelines for the project.
