@@ -18,10 +18,12 @@ export interface TodoWithCriticalPath extends TodoWithDependencies {
   slack: number;
 }
 
-export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number, TodoWithCriticalPath> {
+export function calculateCriticalPath(
+  todos: TodoWithDependencies[]
+): Map<number, TodoWithCriticalPath> {
   const todoMap = new Map<number, TodoWithCriticalPath>();
   const graph = new Map<number, Set<number>>();
-  
+
   // Helper to convert date strings to Date objects
   const toDate = (date: Date | string | null): Date | null => {
     if (!date) return null;
@@ -30,7 +32,7 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
   };
 
   // Helper to add days to a date
-  const addDays = (date: Date | null, days: number): Date | null=> {
+  const addDays = (date: Date | null, days: number): Date | null => {
     if (!date) return null;
     const result = new Date(date);
     result.setDate(result.getDate() + days);
@@ -50,10 +52,10 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
   };
 
   // Initialize todos and build dependency graph
-  todos.forEach(todo => {
+  todos.forEach((todo) => {
     const dueDate = toDate(todo.dueDate);
     const duration = calculateDuration(dueDate);
-    
+
     todoMap.set(todo.id, {
       ...todo,
       dueDate: dueDate,
@@ -66,25 +68,32 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
       isCritical: false,
       slack: 0,
     });
-    graph.set(todo.id, new Set(todo.dependencies.map(dep => dep.id)));
+    graph.set(todo.id, new Set(todo.dependencies.map((dep) => dep.id)));
   });
 
   // Find all tasks with no dependencies (start nodes)
-  const startNodes = todos.filter(todo => todo.dependencies.length === 0).map(t => t.id);
-  
+  const startNodes = todos
+    .filter((todo) => todo.dependencies.length === 0)
+    .map((t) => t.id);
+
   // Find all tasks with no dependents (end nodes)
-  const endNodes = todos.filter(todo => todo.dependents.length === 0).map(t => t.id);
+  const endNodes = todos
+    .filter((todo) => todo.dependents.length === 0)
+    .map((t) => t.id);
 
   // Forward pass - calculate earliest start and finish times
-  const calculateEarliestTimes = (todoId: number, visited: Set<number> = new Set()): void => {
+  const calculateEarliestTimes = (
+    todoId: number,
+    visited: Set<number> = new Set()
+  ): void => {
     if (visited.has(todoId)) return;
     visited.add(todoId);
-    
+
     const todo = todoMap.get(todoId);
     if (!todo) return;
-    
+
     const dependencies = Array.from(graph.get(todoId) || []);
-    
+
     if (dependencies.length === 0) {
       // No dependencies - can start immediately
       todo.earliestStartDate = new Date();
@@ -92,35 +101,41 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
     } else {
       // Has dependencies - must wait for all to complete
       let latestFinish = new Date(0); // Very early date
-      
+
       for (const depId of dependencies) {
         const dep = todoMap.get(depId);
         if (!dep) continue;
-        
+
         if (!dep.earliestFinishDate) {
           calculateEarliestTimes(depId, visited);
         }
-        
+
         if (dep.earliestFinishDate && dep.earliestFinishDate > latestFinish) {
           latestFinish = dep.earliestFinishDate;
         }
       }
-      
+
       todo.earliestStartDate = new Date(latestFinish);
       todo.earliestFinishDate = addDays(todo.earliestStartDate, todo.duration);
     }
   };
 
   // Backward pass - calculate latest start and finish times
-  const calculateLatestTimes = (todoId: number, projectEndDate: Date, visited: Set<number> = new Set()): void => {
+  const calculateLatestTimes = (
+    todoId: number,
+    projectEndDate: Date,
+    visited: Set<number> = new Set()
+  ): void => {
     if (visited.has(todoId)) return;
     visited.add(todoId);
-    
+
     const todo = todoMap.get(todoId);
     if (!todo) return;
-    
-    const dependents = todos.filter(t => t.dependencies.some(d => d.id === todoId)).map(t => t.id);
-    
+
+    const dependents = todos
+      .filter((t) => t.dependencies.some((d) => d.id === todoId))
+      .map((t) => t.id);
+
     if (dependents.length === 0) {
       // No dependents - latest finish is project end or due date
       todo.latestFinishDate = todo.dueDate || projectEndDate;
@@ -128,27 +143,31 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
     } else {
       // Has dependents - must finish before earliest dependent starts
       let earliestDependentStart = projectEndDate;
-      
+
       for (const depId of dependents) {
         const dep = todoMap.get(depId);
         if (!dep) continue;
-        
+
         if (!dep.latestStartDate) {
           calculateLatestTimes(depId, projectEndDate, visited);
         }
-        
-        if (dep.latestStartDate && dep.latestStartDate < earliestDependentStart) {
+
+        if (
+          dep.latestStartDate &&
+          dep.latestStartDate < earliestDependentStart
+        ) {
           earliestDependentStart = dep.latestStartDate;
         }
       }
-      
+
       todo.latestFinishDate = new Date(earliestDependentStart);
       todo.latestStartDate = addDays(todo.latestFinishDate, -todo.duration);
     }
-    
+
     // Calculate slack
     if (todo.earliestStartDate && todo.latestStartDate) {
-      const slackMs = todo.latestStartDate.getTime() - todo.earliestStartDate.getTime();
+      const slackMs =
+        todo.latestStartDate.getTime() - todo.earliestStartDate.getTime();
       todo.slack = Math.max(0, slackMs / (1000 * 60 * 60 * 24));
     }
   };
@@ -156,73 +175,75 @@ export function calculateCriticalPath(todos: TodoWithDependencies[]): Map<number
   // Find the critical path
   const findCriticalPath = (): number[] => {
     // Find the end node(s) with zero slack
-    const criticalEndNodes = endNodes.filter(nodeId => {
+    const criticalEndNodes = endNodes.filter((nodeId) => {
       const node = todoMap.get(nodeId);
       return node && node.slack === 0;
     });
-    
+
     if (criticalEndNodes.length === 0) return [];
-    
+
     // Trace back through the network following zero-slack path
     const path: number[] = [];
     const tracePath = (nodeId: number): void => {
       const node = todoMap.get(nodeId);
       if (!node) return;
-      
+
       path.unshift(nodeId); // Add to beginning of path
-      
+
       // Find critical predecessor (dependency with zero slack)
-      const criticalDep = node.dependencies.find(dep => {
+      const criticalDep = node.dependencies.find((dep) => {
         const depNode = todoMap.get(dep.id);
         return depNode && depNode.slack === 0;
       });
-      
+
       if (criticalDep) {
         tracePath(criticalDep.id);
       }
     };
-    
+
     // Start from the first critical end node
     tracePath(criticalEndNodes[0]);
-    
+
     return path;
   };
 
   try {
     // Forward pass - calculate earliest times
-    todos.forEach(todo => {
+    todos.forEach((todo) => {
       calculateEarliestTimes(todo.id);
     });
-    
+
     // Find project end date (latest earliest finish)
     let projectEndDate = new Date();
-    todos.forEach(todo => {
+    todos.forEach((todo) => {
       const todoData = todoMap.get(todo.id);
-      if (todoData?.earliestFinishDate && todoData.earliestFinishDate > projectEndDate) {
+      if (
+        todoData?.earliestFinishDate &&
+        todoData.earliestFinishDate > projectEndDate
+      ) {
         projectEndDate = todoData.earliestFinishDate;
       }
     });
-    
+
     // Backward pass - calculate latest times
-    todos.forEach(todo => {
+    todos.forEach((todo) => {
       calculateLatestTimes(todo.id, projectEndDate);
     });
-    
+
     // Find the critical path
     const criticalPath = findCriticalPath();
-    
+
     // Mark all tasks on the critical path
-    criticalPath.forEach(nodeId => {
+    criticalPath.forEach((nodeId) => {
       const node = todoMap.get(nodeId);
       if (node) {
         node.isCritical = true;
         node.criticalPath = criticalPath;
       }
     });
-    
   } catch (error) {
-    console.error('Error calculating critical path:', error);
+    console.error("Error calculating critical path:", error);
   }
-  
+
   return todoMap;
 }
